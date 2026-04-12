@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mastering A/B Waveform Player</title>
+
+<script src="https://unpkg.com/wavesurfer.js@7"></script>
+<script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+
+<style>
+  body {
+    background: none;
+    font-family: Arial, sans-serif;
+    color: none;
+    padding: 20px;
+  }
+
+  .player {
+    max-width: 1000px;
+    margin: auto;
+  }
+
+  .wave-container {
+    margin-bottom: 20px;
+  }
+
+  .wave {
+    height: 120px;
+    background: #1a1a1a;
+    border-radius: 8px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+  }
+
+  button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+  }
+
+  .active {
+    background: #9f9f9f;
+    color: black;
+  }
+
+  .inactive {
+    background: #2f2f2f;
+    color: white;
+  }
+
+  .slider {
+    margin-top: 15px;
+  }
+
+  input[type=range] {
+    width: 100%;
+  }
+
+</style>
+</head>
+
+<body>
+
+<div class="player">
+
+  <div class="wave-container">
+    <div id="waveA" class="wave"></div>
+  </div>
+
+  <div class="wave-container">
+    <div id="waveB" class="wave"></div>
+  </div>
+
+  <div class="controls">
+    <button id="playBtn">Play / Pause</button>
+    <button id="btnA" class="active">Before</button>
+    <button id="btnB" class="inactive">After</button>
+  </div>
+
+  <div class="slider">
+    Crossfade: Before ↔ After
+    <input type="range" id="crossfade" min="0" max="1" step="0.01" value="0">
+  </div>
+
+</div>
+
+<script>
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+  const waveA = WaveSurfer.create({
+    container: '#waveA',
+    waveColor: '#5f5f5f',
+    progressColor: '#f0f0f0',
+    height: 120,
+    normalize: false,
+    backend: 'WebAudio',
+    audioContext: audioContext
+  });
+
+  const waveB = WaveSurfer.create({
+    container: '#waveB',
+    waveColor: '#5f5f5f',
+    progressColor: '#f0f0f0',
+    height: 120,
+    normalize: false,
+    backend: 'WebAudio',
+    audioContext: audioContext
+  });
+
+  // LOAD YOUR FILES HERE
+  waveA.load('SampleBefore.wav');
+  waveB.load('SampleAfter.wav');
+
+  let active = 'A';
+  let isPlaying = false;
+
+  const btnA = document.getElementById('btnA');
+  const btnB = document.getElementById('btnB');
+  const playBtn = document.getElementById('playBtn');
+  const crossfade = document.getElementById('crossfade');
+
+  function syncPosition(source, target) {
+    const time = source.getCurrentTime();
+    target.setTime(time);
+  }
+
+  function playBoth() {
+    waveA.play();
+    waveB.play();
+    isPlaying = true;
+  }
+
+  function pauseBoth() {
+    waveA.pause();
+    waveB.pause();
+    isPlaying = false;
+  }
+
+  function switchTo(version) {
+    active = version;
+
+    if (version === 'A') {
+      btnA.classList.add('active');
+      btnB.classList.remove('active');
+      btnA.classList.remove('inactive');
+      btnB.classList.add('inactive');
+      crossfade.value = 0;
+      waveA.setVolume(1);
+      waveB.setVolume(0);
+    } else {
+      btnB.classList.add('active');
+      btnA.classList.remove('active');
+      btnB.classList.remove('inactive');
+      btnA.classList.add('inactive');
+      crossfade.value = 1;
+      waveA.setVolume(0);
+      waveB.setVolume(1);
+    }
+  }
+
+  playBtn.onclick = () => {
+    if (!isPlaying) {
+      playBoth();
+    } else {
+      pauseBoth();
+    }
+  };
+
+  btnA.onclick = () => switchTo('A');
+  btnB.onclick = () => switchTo('B');
+
+  // Keyboard switching (pro workflow)
+  document.addEventListener('keydown', e => {
+    if (e.key.toLowerCase() === 'a') switchTo('A');
+    if (e.key.toLowerCase() === 'b') switchTo('B');
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (!isPlaying) playBoth();
+      else pauseBoth();
+    }
+  });
+
+  // Keep both tracks sample-aligned
+  waveA.on('seeking', () => syncPosition(waveA, waveB));
+  waveB.on('seeking', () => syncPosition(waveB, waveA));
+
+  // Crossfade blend
+  crossfade.addEventListener('input', () => {
+    const value = parseFloat(crossfade.value);
+    waveA.setVolume(1 - value);
+    waveB.setVolume(value);
+  });
+
+  // Initialize volumes
+  waveA.setVolume(1);
+  waveB.setVolume(0);
+
+</script>
+
+</body>
+</html>
